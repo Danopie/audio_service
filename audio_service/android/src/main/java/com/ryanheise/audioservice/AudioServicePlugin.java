@@ -550,7 +550,8 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
                         @SuppressWarnings("unchecked") List<Map<?, ?>> rawMediaItems = (List<Map<?, ?>>)response.get("children");
                         List<MediaBrowserCompat.MediaItem> mediaItems = new ArrayList<>();
                         for (Map<?, ?> rawMediaItem : rawMediaItems) {
-                            mediaItems.add(rawToMediaItem(rawMediaItem));
+                            MediaMetadataCompat mediaMetadata = createMediaMetadata(rawMediaItem);
+                            mediaItems.add(new MediaBrowserCompat.MediaItem(mediaMetadata.getDescription(), (Boolean)rawMediaItem.get("playable") ? MediaBrowserCompat.MediaItem.FLAG_PLAYABLE : MediaBrowserCompat.MediaItem.FLAG_BROWSABLE));
                         }
                         result.sendResult(mediaItems);
                     }
@@ -581,7 +582,8 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
                         Map<?, ?> response = (Map<?, ?>)obj;
                         Map<?, ?> rawMediaItem = (Map<?, ?>)response.get("mediaItem");
                         if (rawMediaItem != null) {
-                            MediaBrowserCompat.MediaItem mediaItem = rawToMediaItem(rawMediaItem);
+                            MediaMetadataCompat mediaMetadata = createMediaMetadata(rawMediaItem);
+                            MediaBrowserCompat.MediaItem mediaItem = new MediaBrowserCompat.MediaItem(mediaMetadata.getDescription(), (Boolean)rawMediaItem.get("playable") ? MediaBrowserCompat.MediaItem.FLAG_PLAYABLE : MediaBrowserCompat.MediaItem.FLAG_BROWSABLE);
                             result.sendResult(mediaItem);
                         } else {
                             result.sendResult(null);
@@ -615,7 +617,8 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
                         @SuppressWarnings("unchecked") List<Map<?, ?>> rawMediaItems = (List<Map<?, ?>>)response.get("mediaItems");
                         List<MediaBrowserCompat.MediaItem> mediaItems = new ArrayList<>();
                         for (Map<?, ?> rawMediaItem : rawMediaItems) {
-                            mediaItems.add(rawToMediaItem(rawMediaItem));
+                            MediaMetadataCompat mediaMetadata = createMediaMetadata(rawMediaItem);
+                            mediaItems.add(new MediaBrowserCompat.MediaItem(mediaMetadata.getDescription(), (Boolean)rawMediaItem.get("playable") ? MediaBrowserCompat.MediaItem.FLAG_PLAYABLE : MediaBrowserCompat.MediaItem.FLAG_BROWSABLE));
                         }
                         result.sendResult(mediaItems);
                     }
@@ -1119,48 +1122,12 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
         );
     }
 
-    /**
-     * Propagate mediaItem extras passed from dart to the description. By default, when creating
-     * a MediaMetadataCompat object, it doesn't propagate all the extras to the MediaDescription
-     * instance it holds.
-     *
-     * @param description original description object
-     * @param extras extras map coming from dart
-     * @return description with added extras
-     */
-    private static MediaDescriptionCompat addExtrasToMediaDescription(MediaDescriptionCompat description, Map<?, ?> extras) {
-        if (extras == null || extras.isEmpty()) {
-            return description;
-        }
-        final Bundle extrasBundle = new Bundle();
-        if (description.getExtras() != null) {
-            extrasBundle.putAll(description.getExtras());
-        }
-        extrasBundle.putAll(mapToBundle(extras));
-        return new MediaDescriptionCompat.Builder()
-                .setTitle(description.getTitle())
-                .setSubtitle(description.getSubtitle())
-                .setDescription(description.getDescription())
-                .setIconBitmap(description.getIconBitmap())
-                .setIconUri(description.getIconUri())
-                .setMediaId(description.getMediaId())
-                .setMediaUri(description.getMediaUri())
-                .setExtras(extrasBundle).build();
-    }
-
-    private static MediaBrowserCompat.MediaItem rawToMediaItem(Map<?, ?> rawMediaItem) {
-        MediaMetadataCompat mediaMetadata = createMediaMetadata(rawMediaItem);
-        final MediaDescriptionCompat description = addExtrasToMediaDescription(mediaMetadata.getDescription(), (Map<?, ?>)rawMediaItem.get("extras"));
-        final Boolean playable = (Boolean)rawMediaItem.get("playable");
-        return new MediaBrowserCompat.MediaItem(description, playable ? MediaBrowserCompat.MediaItem.FLAG_PLAYABLE : MediaBrowserCompat.MediaItem.FLAG_BROWSABLE);
-    }
-
     private static List<MediaSessionCompat.QueueItem> raw2queue(List<Map<?, ?>> rawQueue) {
         List<MediaSessionCompat.QueueItem> queue = new ArrayList<>();
         int i = 0;
         for (Map<?, ?> rawMediaItem : rawQueue) {
             MediaMetadataCompat mediaMetadata = createMediaMetadata(rawMediaItem);
-            MediaDescriptionCompat description = addExtrasToMediaDescription(mediaMetadata.getDescription(), (Map<?, ?>)rawMediaItem.get("extras"));
+            MediaDescriptionCompat description = mediaMetadata.getDescription();
             queue.add(new MediaSessionCompat.QueueItem(description, i));
             i++;
         }
@@ -1179,10 +1146,13 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
         if (bundle == null) return null;
         Map<String, Object> map = new HashMap<>();
         for (String key : bundle.keySet()) {
-            // TODO: use typesafe version once SDK 33 is released.
-            @SuppressWarnings("deprecation")
-            Object value = bundle.getSerializable(key);
-            if (value != null) {
+            Object value = bundle.get(key);
+            if (value instanceof Integer
+                    || value instanceof Long
+                    || value instanceof Double
+                    || value instanceof Float
+                    || value instanceof Boolean
+                    || value instanceof String) {
                 map.put(key, value);
             }
         }

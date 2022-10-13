@@ -336,7 +336,6 @@ Additionally:
     
     <!-- ADD THIS "SERVICE" element -->
     <service android:name="com.ryanheise.audioservice.AudioService"
-        android:foregroundServiceType="mediaPlayback"
         android:exported="true" tools:ignore="Instantiatable">
       <intent-filter>
         <action android:name="android.media.browse.MediaBrowserService" />
@@ -364,7 +363,7 @@ Note: when targeting Android 12 or above, you must set `android:exported` on eac
   tools:keep="@drawable/*" />
 ```
 
-By default plugin's default icons are not stripped by R8. If you don't use them, you may selectively strip them. For example, the rules below will keep all your icons and discard all the plugin's:
+By default plugin's default icons are not stipped by R8. If you don't use them, you may selectively strip them. For example, the rules below will keep all your icons and discard all the plugin's:
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -376,38 +375,20 @@ By default plugin's default icons are not stripped by R8. If you don't use them,
 
 For more information about shrinking see [Android documentation](https://developer.android.com/studio/build/shrink-code#keep-resources).
 
-
 ### Custom Android activity
 
-If your app needs to use its own custom activity, make sure you update your `AndroidManifest.xml` file to reference your activity's class name instead of `AudioServiceActivity`. For example, if your activity class is named `MainActivity`, then use:
-
-```xml
-    <activity android:name=".MainActivity" ...>
-```
-
-Depending on whether you activity is a regular `Activity` or a `FragmentActivity`, you must also include some code to link to audio_service's shared `FlutterEngine`. The easiest way to accomplish this is to inherit that code from one of audio_service's provided base classes.
-
-1. Integration as an `Activity`:
+If your app uses a custom activity, you will need to override `provideFlutterEngine` as follows to ensure that your activity and service use the same shared Flutter engine:
 
 ```java
-import com.ryanheise.audioservice.AudioServiceActivity;
-
-class MainActivity extends AudioServiceActivity {
-    // ...
+public class CustomActivity extends FlutterActivity {
+  @Override
+  public FlutterEngine provideFlutterEngine(Context context) {
+    return AudioServicePlugin.getFlutterEngine(context);
+  }
 }
 ```
 
-2. Integration as a `FragmentActivity`:
-
-```java
-import com.ryanheise.audioservice.AudioServiceFragmentActivity;
-
-class MainActivity extends AudioServiceFragmentActivity {
-    // ...
-}
-```
-
-You can also write your own activity class from scratch, and override the `provideFlutterEngine`, `getCachedEngineId` and `shouldDestroyEngineWithHost` methods yourself. For inspiration, see the source code of the provided `AudioServiceActivity` and `AudioServiceFragmentActivity` classes.
+Alternatively, you can make your custom activity a subclass of `AudioServiceActivity` and thereby inherit its implementation of `provideFlutterEngine`.
 
 ## iOS setup
 
